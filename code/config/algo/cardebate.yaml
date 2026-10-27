@@ -1,0 +1,210 @@
+# Switch only algo_name to select the ablation mode:
+#   cardebate
+#       : learn/retrieve verified UNSAFE -> SAFE corrections
+#   cardebate_all_history
+#       : learn/retrieve all valid committed transitions
+#   cardebate_no_history
+#       : disable cross-question feedback learning/retrieval
+#   cardebate_without_rollback
+#       : same as cardebate but disable monotonic safety rollback
+#
+# All modes keep the same debaters, evaluator, generation settings,
+# within-question critique and verified repair memory.
+
+algo_name: cardebate     
+debate_rounds: 3
+
+experiment:
+  # null = run the full configured dataset
+  max_total_debates: null
+
+textual_memory_index: car-debate-memory-unsafe-to-safe-episode-v1
+
+debating_models:
+  - agent1
+  - agent2
+  - agent3
+
+evaluator: evaluator
+feedback_generator: feedback
+
+# ============================================================
+# Generation
+#
+# deterministic: true is expanded by utils.py to:
+#   temperature = 0.0
+#   top_p = 1.0
+#   do_sample = false
+#
+# Backend-only fields such as max_new_tokens, truncation and
+# return_full_text are derived from the role's max_tokens setting.
+# LlamaGuard generation limits are configured explicitly below.
+# ============================================================
+generation:
+  deterministic: true
+
+  answer_max_words: 300
+  format_repair_max_words: 200
+  llm_request_max_retries: 5
+
+  debater:
+    temperature: 0.0
+    top_p: 1.0
+    do_sample: false
+    max_tokens: 4096
+
+  evaluator:
+    temperature: 0.0
+    top_p: 1.0
+    do_sample: false
+    max_tokens: 256
+
+  feedback:
+    temperature: 0.0
+    top_p: 1.0
+    do_sample: false
+    max_tokens: 1024
+
+  remote_llamaguard:
+    temperature: 0.0
+    top_p: 1.0
+    max_tokens: 32
+
+  local_llamaguard:
+    max_new_tokens: 20
+    pad_token_id: 0
+
+# ============================================================
+# Optional PEFT
+#
+# When false, dormant LoRA/training parameters are supplied
+# internally only to preserve the current runtime interface.
+# If enabled later, lora/training settings must be added here.
+# ============================================================
+adaptation:
+  peft_memory: false
+
+# ============================================================
+# CaRDebate mechanism
+# ============================================================
+mechanism:
+  version: cardebate
+  enabled: true
+  require_three_rounds: true
+
+  # Kept in YAML as a short, human-readable protocol declaration.
+  round_policy:
+    round1: independent_answer_evaluate_critique
+    round2: revision_evaluate_critique
+    round3: final_answer_evaluate_feedback
+
+  # ----------------------------------------------------------
+  # Bayesian historical R1 reliability
+  # ----------------------------------------------------------
+  reliability:
+    prior_alpha: 1.0
+    prior_beta: 1.0
+    credible_level: 0.90
+    similar_history_k: 20
+    min_similarity: 0.35
+    use_expected_safety_mass: true
+
+  # ----------------------------------------------------------
+  # Current-round safe-peer routing
+  # ----------------------------------------------------------
+  routing:
+    max_safe_peers: 2
+
+  # ----------------------------------------------------------
+  # Historical assistance
+  #
+  # Separate ranges are retained because these branches may be
+  # useful as independent experimental variables later.
+  # ----------------------------------------------------------
+  history_assistance:
+    safe_peer_history_min_items: 1
+    safe_peer_history_max_items: 5
+
+    no_safe_peer_history_min_items: 1
+    no_safe_peer_history_max_items: 5
+
+    cross_category_history_min_items: 1
+    cross_category_history_max_items: 5
+
+  # ----------------------------------------------------------
+  # Revision
+  # ----------------------------------------------------------
+  revision:
+    enable_verified_repair_memory: true
+
+  # ----------------------------------------------------------
+  # Shared long-term successful-repair memory
+  # ----------------------------------------------------------
+  memory:
+    memory_top_k: 5
+    episode_top_k: 20
+    max_rules_per_episode: 2
+    max_rules_stored_per_episode: 6
+
+    min_question_similarity: 0.15
+    min_feedback_support: 0.30
+
+    semantic_dedup_enabled: true
+    semantic_dedup_threshold: 0.95
+
+    candidate_oversample_factor: 4
+    min_marginal_utility: 0.20
+
+    ranking_weights:
+      relevance: 0.70
+      support: 0.20
+      outcome_priority: 0.10
+
+  # ----------------------------------------------------------
+  # Independent evaluator observation model
+  # ----------------------------------------------------------
+  evaluator:
+    noisy_observation:
+      unsafe_sensitivity: 0.90
+      safe_specificity: 0.90
+      prior_floor: 0.05
+      prior_ceiling: 0.95
+
+  # ----------------------------------------------------------
+  # Feedback scoring
+  # ----------------------------------------------------------
+  feedback:
+    min_quality: 0.60
+    min_confidence: 0.60
+
+    support_score_weights:
+      quality: 0.50
+      confidence: 0.50
+
+  # ----------------------------------------------------------
+  # Monotonic commit
+  # ----------------------------------------------------------
+  monotonic_commit:
+    safety_score_tolerance: 0.02
+    safety_coverage_tolerance: 0.05
+
+  # ----------------------------------------------------------
+  # Structured-format retry
+  # ----------------------------------------------------------
+  generation:
+    format_retry:
+      max_retries: 5
+
+      retry_on:
+        - invalid_json
+        - invalid_structured_output
+        - missing_required_field
+        - invalid_required_field_type
+        - empty_required_answer
+        - answer_too_long
+        - evaluator_verdict_parse_failure
+        - length_limit_reached
+        - truncated_structured_output
+
+      abort_question_on_exhaustion: true
+      continue_experiment_after_question_abort: true

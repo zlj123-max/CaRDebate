@@ -1,0 +1,84 @@
+project:
+  project_dir: 
+  data_root: 
+
+environment:
+  conda_env: /root/miniforge3/envs/CaRDebate
+  vllm_env: /root/miniforge3/envs/vllm
+  cuda_home: /usr/local/cuda-12.8
+
+model_server:
+  model_server_root: /CaRDebate/model_server
+  model_server_log: /CaRDebate/model_server/logs
+  model_server_pid: /CaRDebate/model_server/pids
+
+dataset:
+  name: harmbench
+  path: /datasets/HarmBench/data/behavior_datasets/harmbench_behaviors_text_all.csv
+  # name: beavertails_evaluation
+  # path: /datasets/PKU-Alignment/BeaverTails-Evaluation/v1/beavertails_evaluation.csv
+  # name: cosafe
+  # path: /datasets/CoSafe-Dataset/cosafe.csv
+  # name: aegis2
+  # path: /datasets/nvidia/Aegis-AI-Content-Safety-Dataset-2.0/aegis2_core.csv
+  # name: wildjailbreak
+  # path: /datasets/allenai/wildjailbreak/train/train.csv
+
+
+router:
+  host: 127.0.0.1
+  port: 8020
+  api_key: local
+  remote_base_url: https://api.openai-proxy.org/v1
+
+models:
+  agent1:
+    display_name: Agent1
+    model_path: /data/models/google/gemma-3-12b-it
+    served_name: agent1
+    gpu: 4
+    port: 8021
+    gpu_memory_utilization: 0.90
+    max_model_len: 16438
+
+  agent2:
+    display_name: Agent2
+    model_path: /data/models/Qwen/Qwen3-8B
+    served_name: agent2
+    gpu: 5
+    port: 8022
+    gpu_memory_utilization: 0.90
+    max_model_len: 16438
+
+  agent3:
+    display_name: Agent3
+    model_path: /data/models/deepseek-ai/DeepSeek-R1-Distill-Llama-8B
+    served_name: agent3
+    gpu: 6
+    port: 8023
+    gpu_memory_utilization: 0.90
+    max_model_len: 16438
+
+  evaluator:
+    display_name: Evaluator
+    model_path: /data/models/meta-llama/Llama-Guard-3-8B
+    served_name: evaluator
+    gpu: 7
+    port: 8024
+    gpu_memory_utilization: 0.90
+    max_model_len: 8192
+
+remote_models:
+  feedback:
+    served_name: gpt-4o-mini
+
+model_output_files:
+  agent1: gemma-3-12b-it.jsonl
+  agent2: qwen3-8b.jsonl
+  agent3: deepSeek-r1-distill-llama-8b.jsonl
+  evaluator: llama-guard-3-8b.jsonl
+  feedback: gpt-4o-mini-feedback.jsonl
+
+generation:
+  answer_max_words: 300
+  format_repair_max_words: 200
